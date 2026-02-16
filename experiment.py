@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from src.agent_graph import app
+from src.ingest import ingest_documents
 
 load_dotenv()
 
@@ -21,10 +22,22 @@ SERVICE AGREEMENT
 """
 
 def run_experiment():
-    print("Starting Experiment with Sample Contract...")
+    print("Starting Experiment with RAG...")
     
+    # 1. Save contract to file for ingestion
+    sample_file = "sample_contract.txt"
+    with open(sample_file, "w") as f:
+        f.write(TEST_CONTRACT)
+        
+    # 2. Ingest into Pinecone
+    print(f"Ingesting {sample_file}...")
+    ingest_documents([sample_file])
+    
+    # 3. Run the graph
+    # Note: We don't strictly need to pass 'contract_text' anymore if using RAG,
+    # but keeping it in state might be useful for reference or hybrid search.
     initial_state = {
-        "contract_text": TEST_CONTRACT,
+        "contract_text": TEST_CONTRACT, 
         "compliance_analysis": "",
         "finance_analysis": "",
         "legal_analysis": "",
@@ -32,6 +45,7 @@ def run_experiment():
     }
     
     # Run the graph
+    print("Invoking agent graph...")
     result = app.invoke(initial_state)
     
     print("\n\n=== EXPERIMENT RESULTS ===\n")
@@ -51,6 +65,10 @@ def run_experiment():
     print(">> OPERATIONS ANALYSIS:")
     print(result.get("operations_analysis", "No output"))
     print("-" * 50)
+    
+    # Cleanup
+    if os.path.exists(sample_file):
+        os.remove(sample_file)
 
 if __name__ == "__main__":
     run_experiment()
