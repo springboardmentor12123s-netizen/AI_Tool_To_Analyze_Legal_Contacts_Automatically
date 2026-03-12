@@ -53,13 +53,15 @@ class ContractVectorStore:
         self.index.upsert(vectors=[(clause_id, vector, full_metadata)])
         print(f"[PineconeStore] Stored clause {clause_id} for domain {full_metadata['domain']}")
 
-    def retrieve_similar(self, query: str, domain_filter: str = None, top_k: int = 5) -> List[Dict[str, Any]]:
-        """Retrieve similar clauses, optionally filtered by domain."""
+    def retrieve_similar(self, query: str, domain_filter: str = None, contract_id: str = None, top_k: int = 5) -> List[Dict[str, Any]]:
+        """Retrieve similar clauses, optionally filtered by domain and/or contract ID."""
         query_vector = self.embeddings_model.embed_query(query)
         
         filter_dict = {}
         if domain_filter:
             filter_dict["domain"] = domain_filter
+        if contract_id:
+            filter_dict["contract_id"] = contract_id
             
         results = self.index.query(
             vector=query_vector,

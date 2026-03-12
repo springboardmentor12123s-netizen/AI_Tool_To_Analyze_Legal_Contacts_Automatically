@@ -18,6 +18,7 @@ class AgentState(TypedDict):
     clauses: List[str]
     extracted_data: Dict[str, Any]
     final_report: str
+    filename: str
 
 # --- LLM Initialization ---
 llm = ChatGroq(
@@ -66,7 +67,7 @@ async def extraction_node(state: AgentState):
                 if has_risk or "ERROR" in str(finding):
                     metadata = {
                         "domain": domain,
-                        "contract_id": "current_session", # In a real app, pass this in state
+                        "contract_id": state.get("filename", "unknown"),
                         **finding
                     }
                     vector_store_manager.store_clause(
