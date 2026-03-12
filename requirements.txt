@@ -1,0 +1,12 @@
+streamlit
+openai
+pypdf
+python-dotenv
+requests
+langchain
+langgraph
+langchain-openai
+langchain-pinecone
+langchain-text-splitters
+pinecone
+sentence-transformers
