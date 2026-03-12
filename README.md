@@ -43,18 +43,26 @@ ClauseAI is a multi-agent system designed to analyze legal contracts. It uses **
 
 ## Usage
 
-### Run Experiment
-To run a sample contract analysis:
+### 1. Start Support Services
+Required for both API and UI.
 ```bash
-python experiment.py
+# Start the Backend API
+uvicorn src.api:app --reload --port 8000
 ```
-This script will:
-1. Create a sample contract (`sample_contract.txt`).
-2. Ingest it into Pinecone.
-3. specific agents query Pinecone for relevant clauses.
-4. Print the analysis from each agent.
 
-### Run Tests
+### 2. User Interface (Streamlit)
+The easiest way to use ClauseAI.
+```bash
+streamlit run src/ui.py
+```
+Upload a PDF/DOCX, and the system will:
+1.  Ingest it into Pinecone.
+2.  Classify the contract type (NDA, MSA, etc.).
+3.  Coordinate specific agents to analyze it.
+4.  Display the results.
+
+
+### 4. Run Tests
 ```bash
 python -m pytest tests/
 ```
@@ -63,6 +71,5 @@ python -m pytest tests/
 - `src/agent_graph.py`: LangGraph definition and agent logic.
 - `src/ingest.py`: Document loading and Pinecone ingestion.
 - `tests/`: Unit tests.
-- `experiment.py`: Main script for running contract analysis experiments.
 - `requirements.txt`: Python dependencies.
 

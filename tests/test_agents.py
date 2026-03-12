@@ -1,44 +1,65 @@
 import pytest
-from unittest.mock import MagicMock, patch
-from src.agent_graph import app, retrieve_context
+import asyncio
+from unittest.mock import MagicMock, AsyncMock, patch
+from src.agent_graph import app
+from src.agent_graph import AgentState
 
 @pytest.fixture
-def mock_vector_store():
-    with patch("src.agent_graph.vector_store") as mock_vs:
-        mock_vs.similarity_search.return_value = [
-            MagicMock(page_content="Relevant clause 1"),
-            MagicMock(page_content="Relevant clause 2")
+def mock_parallel_extractor():
+    with patch("src.agent_graph.ParallelExtractor") as mock_pe_class:
+        mock_instance = MagicMock()
+        mock_instance.parallel_extract_all = AsyncMock(return_value={
+            "compliance": [{"risk_level": "HIGH"}],
+            "financial_risk": [{"exposure_amount": "$1M"}],
+            "legal": [{"legal_risk": "MEDIUM"}],
+            "operations": [{"feasibility_risk": "LOW"}]
+        })
+        mock_pe_class.return_value = mock_instance
+        yield mock_instance
+
+@pytest.fixture
+def mock_pinecone_store():
+    with patch("src.agent_graph.vector_store_manager") as mock_vsm:
+        # Mock retrieval for 4 domains
+        retrieved_mocks = [
+            {"metadata": {"text": "dummy risk", "risk_level": "HIGH"}},
+            {"metadata": {"text": "dummy exposure", "exposure_amount": "$1M"}},
+            {"metadata": {"text": "dummy legal risk", "legal_risk": "MEDIUM"}},
+            {"metadata": {"text": "dummy ops risk", "feasibility_risk": "LOW"}}
         ]
-        yield mock_vs
+        # Just return the same mock regardless of domain for simplicity in test
+        mock_vsm.retrieve_similar.return_value = retrieved_mocks
+        yield mock_vsm
 
 @pytest.fixture
 def mock_llm():
     with patch("src.agent_graph.llm") as mock_l:
         mock_response = MagicMock()
-        mock_response.content = "Analysis result"
+        mock_response.content = "Multi-Domain Executive Summary"
         mock_l.invoke.return_value = mock_response
         yield mock_l
 
-def test_retrieve_context(mock_vector_store):
-    context = retrieve_context("query")
-    assert "Relevant clause 1" in context
-    assert "Relevant clause 2" in context
-    mock_vector_store.similarity_search.assert_called()
-
-def test_agent_graph_execution(mock_vector_store, mock_llm):
-    # Test that the graph runs without error and returns expected keys
+def test_agent_graph_execution(mock_parallel_extractor, mock_pinecone_store, mock_llm):
+    # Test that the modern async graph runs without error
     initial_state = {
-        "contract_text": "dummy text",
-        "compliance_analysis": "",
-        "finance_analysis": "",
-        "legal_analysis": "",
-        "operations_analysis": ""
+        "contract_text": "This is a dummy contract.\n\n" + "This clause is long enough to pass the fifty character minimum threshold required by the chunking node.",
+        "clauses": [],
+        "extracted_data": {},
+        "final_report": ""
     }
     
-    # We mock the internal node functions' dependencies (llm, vector_store)
-    # The app.invoke will call the real node functions, which utilize the mocks
-    result = app.invoke(initial_state)
+    # We mock the internal node dependencies (ParallelExtractor, VectorStore, LLM)
+    result = asyncio.run(app.ainvoke(initial_state))
     
-    assert "compliance_analysis" in result
-    assert result["compliance_analysis"] == "Analysis result"
-    assert result["finance_analysis"] == "Analysis result"
+    # Verify State Shape
+    assert "extracted_data" in result
+    assert "compliance" in result["extracted_data"]
+    assert "legal" in result["extracted_data"]
+    assert "final_report" in result
+    assert result["final_report"] == "Multi-Domain Executive Summary"
+    
+    # Verify Mocks Were Called
+    mock_parallel_extractor.parallel_extract_all.assert_called()
+    mock_pinecone_store.store_clause.assert_called()
+    mock_pinecone_store.retrieve_similar.assert_called()
+    mock_llm.invoke.assert_called()

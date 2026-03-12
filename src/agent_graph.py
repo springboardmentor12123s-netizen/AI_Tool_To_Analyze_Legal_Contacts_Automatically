@@ -1,152 +1,161 @@
 import os
-from typing import TypedDict, List, Annotated
+import asyncio
+from typing import TypedDict, List, Dict, Any
 from dotenv import load_dotenv
 
 from langchain_groq import ChatGroq
-from langchain_core.messages import HumanMessage, SystemMessage, BaseMessage
-from langchain_core.prompts import ChatPromptTemplate
-from langgraph.graph import StateGraph, END
-import operator
+from langchain_core.prompts import PromptTemplate
+from langgraph.graph import StateGraph, END, START
+
+from src.parallel_extractor import ParallelExtractor
+from src.pinecone_store import vector_store_manager
 
 load_dotenv()
 
-# Define the State
+# --- State Definition ---
 class AgentState(TypedDict):
     contract_text: str
-    compliance_analysis: str
-    finance_analysis: str
-    legal_analysis: str
-    operations_analysis: str
+    clauses: List[str]
+    extracted_data: Dict[str, Any]
+    final_report: str
 
-# Initialize LLM
-# Using Groq as per previous context, fallback to OpenAI if needed or configured
+# --- LLM Initialization ---
 llm = ChatGroq(
     temperature=0,
     model_name="llama-3.3-70b-versatile",
     api_key=os.environ.get("GROQ_API_KEY")
 )
 
-# --- Agent Prompts ---
-
-# --- Agent Prompts ---
-
-COMPLIANCE_PROMPT = """You are a Compliance Analyst AI. 
-Review the following contract clauses for regulatory compliance issues, adherence to standards, and potential violations.
-Focus on: GDPR, data privacy, industry specific regulations.
-Context Clauses:
-{context}
-"""
-
-FINANCE_PROMPT = """You are a Finance Analyst AI.
-Review the following contract clauses for financial risks, payment terms, penalties, and fiscal obligations.
-Focus on: Payment schedules, currency, late fees, tax implications.
-Context Clauses:
-{context}
-"""
-
-LEGAL_PROMPT = """You are a Legal Analyst AI.
-Review the following contract clauses for legal risks, liability clauses, indemnification, and dispute resolution logic.
-Focus on: Liability caps, jurisdiction, arbitration, termination rights.
-Context Clauses:
-{context}
-"""
-
-OPERATIONS_PROMPT = """You are an Operations Analyst AI.
-Review the following contract clauses for operational feasibility, service level agreements (SLAs), and delivery timelines.
-Focus on: Deliverables, timelines, dependencies, resource requirements.
-Context Clauses:
-{context}
-"""
-
-# --- Vector Store Helper ---
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_pinecone import PineconeVectorStore
-from pinecone import Pinecone, ServerlessSpec
-import time
-
-# Initialize Pinecone Client
-pc = Pinecone(api_key=os.environ.get("PINECONE_API_KEY"))
-index_name = os.environ.get("PINECONE_INDEX_NAME", "clauseai")
-
-# Ensure index exists
-if index_name not in pc.list_indexes().names():
-    print(f"Creating Pinecone index: {index_name}")
-    pc.create_index(
-        name=index_name,
-        dimension=384, # all-MiniLM-L6-v2 dimension
-        metric="cosine",
-        spec=ServerlessSpec(
-            cloud="aws",
-            region="us-east-1"
-        )
-    )
-    # Wait for index to be ready
-    while not pc.describe_index(index_name).status['ready']:
-        time.sleep(1)
-
-# Initialize Embeddings & Vector Store
-embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-vector_store = PineconeVectorStore(index_name=index_name, embedding=embeddings)
-
-def retrieve_context(query: str, k: int = 3) -> str:
-    """Retrieve relevant clauses from Pinecone."""
-    print(f"  [Retrieval] Querying: '{query}'")
-    docs = vector_store.similarity_search(query, k=k)
-    return "\n\n".join([d.page_content for d in docs])
-
 # --- Node Functions ---
 
-def compliance_agent(state: AgentState):
-    print("--- Compliance Agent Working ---")
-    # Retrieve relevant chunks
-    context = retrieve_context("compliance regulation GDPR data privacy standard violation")
-    # Invoke LLM
-    response = llm.invoke(COMPLIANCE_PROMPT.format(context=context))
-    return {"compliance_analysis": response.content}
+def chunk_contract_node(state: AgentState):
+    """Splits the raw text into manageable clauses/paragraphs."""
+    print("--- Orchestrator: Chunking Contract ---")
+    text = state.get("contract_text", "")
+    # Naive split by double newline for paragraphs/clauses
+    raw_clauses = [c.strip() for c in text.split("\n\n") if len(c.strip()) > 50]
+    
+    # If it's a huge contract, we might limit it for the purpose of the demo
+    clauses = raw_clauses[:20] 
+    print(f"  [Chunking] Generated {len(clauses)} candidate clauses.")
+    return {"clauses": clauses}
 
-def finance_agent(state: AgentState):
-    print("--- Finance Agent Working ---")
-    context = retrieve_context("payment fees penalty tax currency fiscal obligation")
-    response = llm.invoke(FINANCE_PROMPT.format(context=context))
-    return {"finance_analysis": response.content}
+async def extraction_node(state: AgentState):
+    """Runs parallel pipelines and stores results in Pinecone."""
+    print("--- Orchestrator: Running Parallel Extraction ---")
+    clauses = state.get("clauses", [])
+    
+    if not clauses:
+        return {"extracted_data": {}}
 
-def legal_agent(state: AgentState):
-    print("--- Legal Agent Working ---")
-    context = retrieve_context("liability indemnification jurisdiction arbitration termination dispute")
-    response = llm.invoke(LEGAL_PROMPT.format(context=context))
-    return {"legal_analysis": response.content}
+    extractor = ParallelExtractor(llm)
+    # This runs Compliance and Finance pipelines concurrently
+    results = await extractor.parallel_extract_all(clauses)
+    
+    # Store intermediate results in Pinecone
+    print("--- Orchestrator: Storing Intermediate Results in Pinecone ---")
+    
+    for domain, findings_list in results.items():
+        # findings_list is a list of Dicts (the JSON output of the pipeline)
+        # It aligns 1:1 with the clauses list
+        for idx, finding in enumerate(findings_list):
+            
+            # Very basic error/null filtering so we don't store garbage
+            if isinstance(finding, dict):
+                has_risk = finding.get("risk_level", "NONE") != "NONE" or finding.get("risk_category", "NONE") != "NONE"
+                if has_risk or "ERROR" in str(finding):
+                    metadata = {
+                        "domain": domain,
+                        "contract_id": "current_session", # In a real app, pass this in state
+                        **finding
+                    }
+                    vector_store_manager.store_clause(
+                        clause_text=clauses[idx],
+                        metadata=metadata
+                    )
 
-def operations_agent(state: AgentState):
-    print("--- Operations Agent Working ---")
-    context = retrieve_context("deliverables timeline SLA service level dependency resource")
-    response = llm.invoke(OPERATIONS_PROMPT.format(context=context))
-    return {"operations_analysis": response.content}
+    return {"extracted_data": results}
 
-# --- Graph Definition ---
+def synthesis_node(state: AgentState):
+    """Generates the final multi-domain risk report."""
+    print("--- Orchestrator: Synthesizing Final Report ---")
+    extracted_data = state.get("extracted_data", {})
+    
+    # We could query Pinecone here, or just use the extracted_data directly.
+    # To prove Pinecone works, let's fetch the top risks from Pinecone!
+    
+    print("  [Synthesis] Retrieving top compliance risks from Pinecone...")
+    compliance_risks = vector_store_manager.retrieve_similar(
+        query="high risk regulatory violation GDPR HIPAA penalty",
+        domain_filter="compliance",
+        top_k=3
+    )
+    
+    print("  [Synthesis] Retrieving top financial risks from Pinecone...")
+    finance_risks = vector_store_manager.retrieve_similar(
+        query="high risk exposure penalty liability cap indemnification",
+        domain_filter="financial_risk",
+        top_k=3
+    )
+    
+    print("  [Synthesis] Retrieving top legal risks from Pinecone...")
+    legal_risks = vector_store_manager.retrieve_similar(
+        query="legal liability warranty jurisdiction termination breach of contract",
+        domain_filter="legal",
+        top_k=3
+    )
+    
+    print("  [Synthesis] Retrieving top operational requirements from Pinecone...")
+    ops_risks = vector_store_manager.retrieve_similar(
+        query="operational deliverables SLA timeline resource allocation failure",
+        domain_filter="operations",
+        top_k=3
+    )
+    
+    # Format prompts
+    c_text = "\n".join([f"- {r['metadata']['text']} (Risk: {r['metadata'].get('risk_level', 'Unknown')})" for r in compliance_risks]) or "No major compliance risks detected."
+    f_text = "\n".join([f"- {r['metadata']['text']} (Exposure: {r['metadata'].get('exposure_amount', 'Unknown')})" for r in finance_risks]) or "No major financial risks detected."
+    l_text = "\n".join([f"- {r['metadata']['text']} (Risk: {r['metadata'].get('legal_risk', 'Unknown')})" for r in legal_risks]) or "No major legal risks detected."
+    o_text = "\n".join([f"- {r['metadata']['text']} (Risk: {r['metadata'].get('feasibility_risk', 'Unknown')})" for r in ops_risks]) or "No major operational issues detected."
+    
+    synthesis_prompt = PromptTemplate.from_template("""
+    You are the Lead Contract Orchestrator. 
+    Synthesize the following identified risks into a clear, single-page executive summary based on the 4 agent domains.
+    
+    1. Compliance Agent Findings:
+    {c_text}
+    
+    2. Financial Agent Findings:
+    {f_text}
+    
+    3. Legal Agent Findings:
+    {l_text}
+    
+    4. Operations Agent Findings:
+    {o_text}
+    
+    Format as a structured markdown report with sections for 'Compliance Summary', 'Financial Summary', 'Legal Summary', and 'Operations Summary'.
+    """)
+    
+    response = llm.invoke(synthesis_prompt.format(
+        c_text=c_text, 
+        f_text=f_text,
+        l_text=l_text,
+        o_text=o_text
+    ))
+    return {"final_report": response.content}
 
 # --- Graph Definition ---
 
 workflow = StateGraph(AgentState)
 
-# Add nodes
-workflow.add_node("compliance", compliance_agent)
-workflow.add_node("finance", finance_agent)
-workflow.add_node("legal", legal_agent)
-workflow.add_node("operations", operations_agent)
+workflow.add_node("chunking", chunk_contract_node)
+workflow.add_node("extraction", extraction_node)
+workflow.add_node("synthesis", synthesis_node)
 
-# Define edges - Parallel execution
-# We can use the special START node to branch to multiple nodes at the beginning
-from langgraph.graph import START
+workflow.add_edge(START, "chunking")
+workflow.add_edge("chunking", "extraction")
+workflow.add_edge("extraction", "synthesis")
+workflow.add_edge("synthesis", END)
 
-workflow.add_edge(START, "compliance")
-workflow.add_edge(START, "finance")
-workflow.add_edge(START, "legal")
-workflow.add_edge(START, "operations")
-
-workflow.add_edge("compliance", END)
-workflow.add_edge("finance", END)
-workflow.add_edge("legal", END)
-workflow.add_edge("operations", END)
-
-# Compile
 app = workflow.compile()
