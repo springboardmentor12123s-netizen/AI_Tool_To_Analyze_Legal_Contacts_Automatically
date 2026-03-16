@@ -1,0 +1,11 @@
+streamlit
+langchain
+langgraph
+openai
+pinecone-client
+pypdf2
+python-docx
+groq
+pinecone
+sentence-transformers
+langchain-community
