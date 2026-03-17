@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.env
+test_files
+setup_nltk.py
+check_models.py
