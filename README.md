@@ -1,75 +1,26 @@
 # ClauseAI - Contract Analysis Agent System
 
-ClauseAI is a multi-agent system designed to analyze legal contracts. It uses **LangGraph** to orchestrate four specialized agents (Compliance, Finance, Legal, Operations) and **Pinecone** for Retrieval-Augmented Generation (RAG).
+![Dashboard Screenshot](https://via.placeholder.com/800x400.png?text=ClauseAI+Dashboard)
 
-## Features
-- **Multi-Agent Architecture**: Specialized agents for different domains.
-- **RAG Integration**: Retrieves relevant contract clauses using Pinecone and HuggingFace embeddings.
-- **Document Support**: Parses PDF, DOCX, and TXT files.
-- **Local Embeddings**: Uses `all-MiniLM-L6-v2` (no OpenAI key required for embeddings).
-- **LLM**: Powered by Groq (Llama 3.3 70B).
+ClauseAI is a multi-agent system designed to deeply analyze legal contracts. It accelerates diligence and mitigates risks by seamlessly orchestrating specialized domain agents (Compliance, Finance, Legal, Operations) to dissect and evaluate documents concurrently.
 
-## Setup
+## Tech Stack
+- **Frontend**: Next.js (React, TailwindCSS)
+- **Backend API**: FastAPI (Python, Uvicorn)
+- **Orchestration**: LangGraph (StateGraph, Parallel Workflows)
+- **Vector Store & RAG**: Pinecone, HuggingFace Embeddings
+- **LLM Engine**: Groq (Llama 3.3 70B Fast Inference)
 
-1.  **Clone the repository**:
-    ```bash
-    git clone <repo-url>
-    cd clauseai
-    ```
+## Documentation
 
-2.  **Install dependencies**:
-    ```bash
-    # Create virtual environment
-    python3 -m venv .venv
-    source .venv/bin/activate
-    
-    # Install packages
-    pip install -r requirements.txt
-    ```
+For instructions on how to set up, operate, and extend this project, refer to the following guides:
 
-3.  **Environment Variables**:
-    Create a `.env` file with:
-    ```bash
-    GROQ_API_KEY=your_groq_key
-    PINECONE_API_KEY=your_pinecone_key
-    ```
-    *Note: `OPENAI_API_KEY` is NOT required.*
+1. [📌 Setup Guide](docs/SETUP.md) - Instructions for local deployment and API keys.
+2. [🏗️ System Architecture](docs/ARCHITECTURE.md) - Deep dive into modules and pipeline data flows.
+3. [🔌 API Reference](docs/API_REFERENCE.md) - Definitions for backend HTTP service routes.
 
-4.  **Initialize Pinecone Index**:
-    Run the setup script to create the `clauseai` index:
-    ```bash
-    python setup_pinecone.py
-    ```
-
-## Usage
-
-### 1. Start Support Services
-Required for both API and UI.
+## Test CLI Execution
+You can easily test the background parallel extraction via script (uses `src/bulk_processor.py`):
 ```bash
-# Start the Backend API
-uvicorn src.api:app --reload --port 8000
+python cli_test_milestone4.py
 ```
-
-### 2. User Interface (Streamlit)
-The easiest way to use ClauseAI.
-```bash
-streamlit run src/ui.py
-```
-Upload a PDF/DOCX, and the system will:
-1.  Ingest it into Pinecone.
-2.  Classify the contract type (NDA, MSA, etc.).
-3.  Coordinate specific agents to analyze it.
-4.  Display the results.
-
-
-### 4. Run Tests
-```bash
-python -m pytest tests/
-```
-
-## Project Structure
-- `src/agent_graph.py`: LangGraph definition and agent logic.
-- `src/ingest.py`: Document loading and Pinecone ingestion.
-- `tests/`: Unit tests.
-- `requirements.txt`: Python dependencies.
-

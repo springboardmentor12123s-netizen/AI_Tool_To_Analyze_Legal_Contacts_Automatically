@@ -1,7 +1,8 @@
 import os
 import shutil
-from typing import List, Dict
+from typing import List, Dict, Any
 from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 from contextlib import asynccontextmanager
@@ -19,6 +20,17 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 class AnalyzeRequest(BaseModel):
     filename: str
+    report_config: Dict[str, Any] = None
+
+class AnalyzeBulkRequest(BaseModel):
+    filenames: List[str]
+    report_config: Dict[str, Any] = None
+
+class FeedbackRequest(BaseModel):
+    filename: str
+    section: str
+    rating: str
+    comment: str = None
 
 class ChatRequest(BaseModel):
     query: str
@@ -29,6 +41,18 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(title="ClauseAI API", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://10.11.224.104:3000"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
@@ -67,6 +91,8 @@ async def analyze_contract(request: AnalyzeRequest):
             "final_report": "",
             "filename": request.filename
         }
+        if request.report_config:
+            initial_state["report_config"] = request.report_config
         
         # Run Graph Asynchronously
         result = await agent_app.ainvoke(initial_state)
@@ -79,6 +105,43 @@ async def analyze_contract(request: AnalyzeRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analysis Error: {str(e)}")
+
+@app.post("/upload_bulk")
+async def upload_bulk(files: List[UploadFile] = File(...)):
+    """Upload multiple contracts."""
+    saved_files = []
+    for file in files:
+        file_path = os.path.join(UPLOAD_DIR, file.filename)
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        saved_files.append(file.filename)
+    return {"filenames": saved_files, "message": "Files uploaded successfully."}
+
+@app.post("/analyze_bulk")
+async def analyze_bulk(request: AnalyzeBulkRequest):
+    """Analyze multiple uploaded contracts asynchronously."""
+    from src.bulk_processor import process_all_documents
+    file_paths = []
+    for fname in request.filenames:
+        fp = os.path.join(UPLOAD_DIR, fname)
+        if not os.path.exists(fp):
+            raise HTTPException(status_code=404, detail=f"File not found: {fname}")
+        file_paths.append(fp)
+    
+    try:
+        results = await process_all_documents(file_paths, config=request.report_config)
+        return {"results": results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Bulk Analysis Error: {str(e)}")
+
+@app.post("/feedback")
+async def submit_feedback(request: FeedbackRequest):
+    """Save user feedback on a report section."""
+    feedback_file = "data/feedback.jsonl"
+    os.makedirs(os.path.dirname(feedback_file), exist_ok=True)
+    with open(feedback_file, "a") as f:
+        f.write(request.model_dump_json() + "\n")
+    return {"status": "success", "message": "Feedback saved."}
 
 @app.post("/chat")
 async def chat_with_contract(request: ChatRequest):

@@ -13,12 +13,13 @@ from src.pinecone_store import vector_store_manager
 load_dotenv()
 
 # --- State Definition ---
-class AgentState(TypedDict):
+class AgentState(TypedDict, total=False):
     contract_text: str
     clauses: List[str]
     extracted_data: Dict[str, Any]
     final_report: str
     filename: str
+    report_config: Dict[str, Any]
 
 # --- LLM Initialization ---
 llm = ChatGroq(
@@ -29,15 +30,17 @@ llm = ChatGroq(
 
 # --- Node Functions ---
 
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
 def chunk_contract_node(state: AgentState):
     """Splits the raw text into manageable clauses/paragraphs."""
     print("--- Orchestrator: Chunking Contract ---")
     text = state.get("contract_text", "")
-    # Naive split by double newline for paragraphs/clauses
-    raw_clauses = [c.strip() for c in text.split("\n\n") if len(c.strip()) > 50]
     
-    # If it's a huge contract, we might limit it for the purpose of the demo
-    clauses = raw_clauses[:20] 
+    # Properly split large documents instead of hard-chopping at 20 paragraphs
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=4000, chunk_overlap=200)
+    clauses = text_splitter.split_text(text)
+    
     print(f"  [Chunking] Generated {len(clauses)} candidate clauses.")
     return {"clauses": clauses}
 
@@ -89,6 +92,7 @@ def synthesis_node(state: AgentState):
     compliance_risks = vector_store_manager.retrieve_similar(
         query="high risk regulatory violation GDPR HIPAA penalty",
         domain_filter="compliance",
+        contract_id=state.get("filename"),
         top_k=3
     )
     
@@ -96,6 +100,7 @@ def synthesis_node(state: AgentState):
     finance_risks = vector_store_manager.retrieve_similar(
         query="high risk exposure penalty liability cap indemnification",
         domain_filter="financial_risk",
+        contract_id=state.get("filename"),
         top_k=3
     )
     
@@ -103,6 +108,7 @@ def synthesis_node(state: AgentState):
     legal_risks = vector_store_manager.retrieve_similar(
         query="legal liability warranty jurisdiction termination breach of contract",
         domain_filter="legal",
+        contract_id=state.get("filename"),
         top_k=3
     )
     
@@ -110,6 +116,7 @@ def synthesis_node(state: AgentState):
     ops_risks = vector_store_manager.retrieve_similar(
         query="operational deliverables SLA timeline resource allocation failure",
         domain_filter="operations",
+        contract_id=state.get("filename"),
         top_k=3
     )
     
@@ -119,26 +126,27 @@ def synthesis_node(state: AgentState):
     l_text = "\n".join([f"- {r['metadata']['text']} (Risk: {r['metadata'].get('legal_risk', 'Unknown')})" for r in legal_risks]) or "No major legal risks detected."
     o_text = "\n".join([f"- {r['metadata']['text']} (Risk: {r['metadata'].get('feasibility_risk', 'Unknown')})" for r in ops_risks]) or "No major operational issues detected."
     
-    synthesis_prompt = PromptTemplate.from_template("""
-    You are the Lead Contract Orchestrator. 
-    Synthesize the following identified risks into a clear, single-page executive summary based on the 4 agent domains.
+    # Handle Report Config
+    raw_risks = {
+        "c_text": c_text,
+        "f_text": f_text,
+        "l_text": l_text,
+        "o_text": o_text
+    }
     
-    1. Compliance Agent Findings:
-    {c_text}
+    from src.report_generator import ReportConfig, ReportGenerator
     
-    2. Financial Agent Findings:
-    {f_text}
+    config_dict = state.get("report_config", {})
+    report_config = ReportConfig(**config_dict)
+    generator = ReportGenerator(report_config)
     
-    3. Legal Agent Findings:
-    {l_text}
+    # Generate the dynamic prompt based on config
+    prompt_str = generator.generate(state.get("contract_text", ""), raw_risks)
     
-    4. Operations Agent Findings:
-    {o_text}
-    
-    Format as a structured markdown report with sections for 'Compliance Summary', 'Financial Summary', 'Legal Summary', and 'Operations Summary'.
-    """)
+    synthesis_prompt = PromptTemplate.from_template(prompt_str)
     
     response = llm.invoke(synthesis_prompt.format(
+        contract_text=state.get("contract_text", "")[:30000],  # safety cap for massive docs
         c_text=c_text, 
         f_text=f_text,
         l_text=l_text,
