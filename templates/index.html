@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>ClauseAI – Intelligent Contract Risk Analyzer</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+<style>
+body{
+font-family:'Inter',sans-serif;
+background:linear-gradient(135deg,#0f0f1a,#1a1a2e,#16213e);
+color:white;
+}
+
+.glass{
+background:rgba(255,255,255,0.05);
+backdrop-filter:blur(15px);
+border:1px solid rgba(255,255,255,0.1);
+}
+
+.gradient-text{
+background:linear-gradient(135deg,#667eea,#764ba2);
+-webkit-background-clip:text;
+-webkit-text-fill-color:transparent;
+}
+
+.glow-btn{
+background:linear-gradient(135deg,#667eea,#764ba2);
+box-shadow:0 0 20px rgba(102,126,234,0.4);
+transition:0.3s;
+}
+.glow-btn:hover{
+transform:translateY(-2px);
+}
+</style>
+</head>
+
+<body>
+
+<!-- HEADER -->
+<header class="p-6 text-center">
+<h1 class="text-4xl font-bold gradient-text">ClauseAI</h1>
+<p class="text-gray-400">AI Powered Contract Risk Detection System</p>
+</header>
+
+<!-- HERO -->
+<section class="text-center py-12">
+<h2 class="text-5xl font-bold mb-4">Analyze Contracts Instantly</h2>
+<p class="text-gray-400">Legal Risk • Financial Risk • Compliance Analysis</p>
+</section>
+
+<!-- UPLOAD + ANALYZE FORM -->
+<section class="max-w-3xl mx-auto p-8">
+
+<div class="glass rounded-xl p-8">
+
+<h3 class="text-2xl font-semibold mb-6 text-center">
+Upload & Analyze Your Contract
+</h3>
+
+<!-- IMPORTANT: Flask form connection -->
+<form action="/analyze" method="POST" enctype="multipart/form-data" class="space-y-6">
+
+<!-- CLAUSE TEXT -->
+<div>
+<label class="block mb-2 text-gray-300">Enter Contract Clause</label>
+<textarea
+name="clause"
+rows="6"
+class="w-full p-4 rounded-lg bg-black/30 border border-gray-600"
+placeholder="Paste your contract clause here..."></textarea>
+</div>
+
+<!-- FILE UPLOAD -->
+<div>
+<label class="block mb-2 text-gray-300">Upload Document (PDF / DOCX)</label>
+<input
+type="file"
+name="file"
+class="w-full p-3 rounded-lg bg-black/30 border border-gray-600">
+</div>
+
+<!-- SUBMIT BUTTON -->
+<button
+type="submit"
+class="w-full glow-btn py-4 rounded-xl font-semibold text-lg">
+Run AI Analysis
+</button>
+
+</form>
+
+</div>
+
+</section>
+
+<!-- FEATURES -->
+<section class="max-w-6xl mx-auto py-16 grid md:grid-cols-4 gap-6 px-6">
+
+<div class="glass p-6 rounded-xl">
+<h4 class="font-semibold mb-2">Legal Risk Analyzer</h4>
+<p class="text-gray-400 text-sm">Detects risky clauses & legal issues</p>
+</div>
+
+<div class="glass p-6 rounded-xl">
+<h4 class="font-semibold mb-2">Financial Risk Analyzer</h4>
+<p class="text-gray-400 text-sm">Finds financial obligations</p>
+</div>
+
+<div class="glass p-6 rounded-xl">
+<h4 class="font-semibold mb-2">Compliance Checker</h4>
+<p class="text-gray-400 text-sm">Ensures regulatory compliance</p>
+</div>
+
+<div class="glass p-6 rounded-xl">
+<h4 class="font-semibold mb-2">Smart Planning Agent</h4>
+<p class="text-gray-400 text-sm">Provides improvement suggestions</p>
+</div>
+
+</section>
+
+<footer class="text-center py-10 text-gray-500">
+ClauseAI © Vaishnavi A Kanade
+</footer>
+
+</body>
+</html>
