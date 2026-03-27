@@ -1,8 +1,13 @@
 from langgraph.graph import StateGraph, END
 from typing import TypedDict
 
-from agents import compliance_agent, legal_agent, finance_agent, operations_agent
-
+from agents import (
+    compliance_agent,
+    legal_agent,
+    finance_agent,
+    operations_agent,
+    report_generator
+)
 
 class ContractState(TypedDict):
     contract: str
@@ -10,24 +15,24 @@ class ContractState(TypedDict):
     legal_result: str
     finance_result: str
     operations_result: str
+    final_report: str
+    tone: str
+    focus: str
 
+graph = StateGraph(ContractState)
 
-builder = StateGraph(ContractState)  # creates the langGraph workflow object
+graph.add_node("compliance", compliance_agent)
+graph.add_node("legal", legal_agent)
+graph.add_node("finance", finance_agent)
+graph.add_node("operations", operations_agent)
+graph.add_node("report", report_generator)
 
-# Add nodes
-builder.add_node("compliance", compliance_agent)
-builder.add_node("legal", legal_agent)
-builder.add_node("finance", finance_agent)
-builder.add_node("operations", operations_agent)
+graph.set_entry_point("compliance")
 
-# Entry point
-builder.set_entry_point("compliance") # defines the execution order
+graph.add_edge("compliance", "legal")
+graph.add_edge("legal", "finance")
+graph.add_edge("finance", "operations")
+graph.add_edge("operations", "report")
+graph.add_edge("report", END)
 
-# Edges
-builder.add_edge("compliance", "legal")
-builder.add_edge("legal", "finance")
-builder.add_edge("finance", "operations")
-builder.add_edge("operations", END)
-
-# Compile graph
-contract_graph = builder.compile() # creates the final execution pipeline
+contract_graph = graph.compile()

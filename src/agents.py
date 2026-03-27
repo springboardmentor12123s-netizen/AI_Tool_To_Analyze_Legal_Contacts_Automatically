@@ -1,30 +1,34 @@
 from langchain_groq import ChatGroq
 from dotenv import load_dotenv
-import os
+import time
 
 load_dotenv()
 
+# -------- LLM --------
 llm = ChatGroq(
     model="llama-3.1-8b-instant",
-    temperature=0
+    temperature=0,
+    max_tokens=800
 )
 
+# -------- SAFE INVOKE --------
+def safe_invoke(prompt):
+    from groq import RateLimitError
 
-# ---------------- COMPLIANCE AGENT ----------------
+    for _ in range(3):
+        try:
+            return llm.invoke(prompt)
+        except RateLimitError:
+            time.sleep(2)
+    return None
 
+
+# -------- COMPLIANCE AGENT --------
 def compliance_agent(state):
-
     contract = state["contract"]
 
     prompt = f"""
-You are a compliance risk analyzer.
-
-Identify the TOP 3 compliance risks in the contract.
-
-STRICT RULES:
-- Do NOT explain in paragraphs
-- Return ONLY the structured format
-- Keep answers short
+Identify TOP 3 compliance risks.
 
 FORMAT:
 
@@ -50,30 +54,22 @@ Contract:
 {contract}
 """
 
-    response = llm.invoke(prompt)
+    response = safe_invoke(prompt)
 
     return {"compliance_result": response.content}
 
 
-# ---------------- LEGAL AGENT ----------------
-
+# -------- LEGAL AGENT --------
 def legal_agent(state):
-
     contract = state["contract"]
     compliance = state["compliance_result"]
 
     prompt = f"""
-You are a legal contract analyst.
+Using contract and compliance findings:
 
-Use the compliance findings and identify the TOP 3 legal issues.
-
-STRICT RULES:
-- Do NOT write paragraphs
-- Output ONLY the format below
-- Keep explanations short
-
-Compliance Findings:
 {compliance}
+
+Identify TOP 3 legal risks.
 
 FORMAT:
 
@@ -99,33 +95,26 @@ Contract:
 {contract}
 """
 
-    response = llm.invoke(prompt)
+    response = safe_invoke(prompt)
 
     return {"legal_result": response.content}
 
 
-# ---------------- FINANCE AGENT ----------------
-
+# -------- FINANCE AGENT --------
 def finance_agent(state):
-
     compliance = state["compliance_result"]
     legal = state["legal_result"]
 
     prompt = f"""
-You are a financial risk analyst.
+Using findings:
 
-Use compliance and legal findings to identify TOP 3 financial risks.
-
-STRICT RULES:
-- No paragraphs
-- Short answers only
-- Follow format strictly
-
-Compliance Findings:
+Compliance:
 {compliance}
 
-Legal Issues:
+Legal:
 {legal}
+
+Identify TOP 3 financial risks.
 
 FORMAT:
 
@@ -148,59 +137,86 @@ Risk Level:
 Recommendation:
 """
 
-    response = llm.invoke(prompt)
+    response = safe_invoke(prompt)
 
     return {"finance_result": response.content}
 
 
-# ---------------- OPERATIONS AGENT ----------------
-
+# -------- OPERATIONS AGENT --------
 def operations_agent(state):
-
     compliance = state["compliance_result"]
     legal = state["legal_result"]
     finance = state["finance_result"]
 
     prompt = f"""
-You are an operations risk analyst.
+Using all findings:
 
-Use previous agent findings to identify TOP 3 operational risks.
-
-STRICT RULES:
-- No paragraphs
-- Only structured format
-
-Compliance Findings:
+Compliance:
 {compliance}
 
-Legal Issues:
+Legal:
 {legal}
 
-Financial Risks:
+Finance:
 {finance}
+
+Identify TOP 3 operational risks.
 
 FORMAT:
 
-
-OPERATIONS RISK 1
+OPERATIONAL RISK 1
 Clause:
 Risk Type:
 Risk Level:
 Recommendation:
 
-OPERATIONS RISK 2
+OPERATIONAL RISK 2
 Clause:
 Risk Type:
 Risk Level:
 Recommendation:
 
-OPERATIONS RISK 3
+OPERATIONAL RISK 3
 Clause:
 Risk Type:
 Risk Level:
 Recommendation:
 """
 
-    response = llm.invoke(prompt)
+    response = safe_invoke(prompt)
 
     return {"operations_result": response.content}
+
+
+# -------- FINAL REPORT --------
+def report_generator(state):
+
+    contract = state["contract"]
+
+    prompt = f"""
+Generate FINAL REPORT.
+
+IMPORTANT:
+- Do NOT copy risks from agent outputs
+- Generate risks based on overall contract understanding
+- Keep it simple and clear
+- No paragraphs
+
+FORMAT:
+
+OVERALL ANALYSIS:
+- Provide 4–5 simple points describing the contract
+
+KEY RISKS:
+- Provide general risks from contract (with level)
+
+RECOMMENDATIONS:
+- Provide overall contract improvement suggestions
+
+Contract:
+{contract}
+"""
+
+    response = safe_invoke(prompt)
+
+    return {"final_report": response.content}
