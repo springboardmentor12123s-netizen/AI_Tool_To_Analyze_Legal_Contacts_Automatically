@@ -1,0 +1,25 @@
+# Core dependencies
+python-dotenv==1.0.0
+
+# LangChain and LangGraph
+langchain==0.1.9
+langgraph==0.0.26
+langchain-community==0.0.24
+langchain-openai==0.1.3
+
+# Vector Database
+pinecone-client==3.0.2
+
+# LLM and embeddings
+openai>=1.10.0,<2.0.0
+
+# Provider integrations
+# Groq provider for high-speed LLMs
+langchain-groq
+# Google GenAI provider for embeddings
+langchain-google-genai
+
+# Utilities
+requests==2.31.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
