@@ -1,5 +1,6 @@
-from langgraph.graph import StateGraph, END
-from typing import TypedDict
+from typing import List, TypedDict
+
+from langgraph.graph import END, StateGraph
 
 from agents import (
     compliance_agent,
@@ -9,12 +10,18 @@ from agents import (
     report_generator
 )
 
+class AgentResult(TypedDict):
+    summary: str
+    risks: List[str]
+    recommendations: List[str]
+
+
 class ContractState(TypedDict):
     contract: str
-    compliance_result: str
-    legal_result: str
-    finance_result: str
-    operations_result: str
+    compliance_result: AgentResult
+    legal_result: AgentResult
+    finance_result: AgentResult
+    operations_result: AgentResult
     final_report: str
     tone: str
     focus: str
