@@ -1,18 +1,17 @@
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-import PyPDF2
+import fitz  # PyMuPDF
 
 
 def extract_text_from_pdf(file_path: str) -> str:
     """Extracts raw text from a PDF file."""
     text = ""
     try:
-        with open(file_path, "rb") as file:
-            reader = PyPDF2.PdfReader(file)
-            for page in reader.pages:
-                content = page.extract_text()
-                if content:
-                    text += content + "\n"
+        doc = fitz.open(file_path)
+        for page in doc:
+            content = page.get_text()
+            if content:
+                text += content + "\n"
     except Exception as e:
         print(f"Error reading PDF: {e}")
     return text

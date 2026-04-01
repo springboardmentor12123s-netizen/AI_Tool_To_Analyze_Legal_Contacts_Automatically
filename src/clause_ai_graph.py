@@ -3,6 +3,7 @@ import operator
 import uuid
 from langgraph.graph import StateGraph, END
 from langchain_core.prompts import ChatPromptTemplate
+from tenacity import retry, stop_after_attempt, wait_exponential
 from src.config import get_llm, get_embeddings, get_pinecone_index
 from src.prompts import (
     LEGAL_SYSTEM_PROMPT, 
@@ -22,6 +23,8 @@ class AgentState(TypedDict):
     tone: str
     structure: str
     focus: str
+    scenario: str
+    source_file: str
 
 class ClauseAIGraph:
     def __init__(self):
@@ -63,6 +66,11 @@ class ClauseAIGraph:
         return workflow.compile()
 
     # --- Node Functions ---
+    @retry(stop=stop_after_attempt(6), wait=wait_exponential(multiplier=2, min=4, max=60))
+    def _invoke_llm_with_retry(self, prompt, **kwargs):
+        """Helper to invoke LLMs with exponential backoff for Groq TPM Rate Limits"""
+        chain = prompt | self.llm
+        return chain.invoke(kwargs)
 
     # Inside ClauseAIGraph class in clause_ai_graph.py
     def classify_contract(self, state: AgentState) -> AgentState:
@@ -74,8 +82,7 @@ class ClauseAIGraph:
                 "category name (e.g., 'Employment Agreement', 'NDA', 'Service Agreement').\n"
                 "Query: {query}"
             )
-            chain = prompt | self.llm
-            response = chain.invoke({"query": state["query"]})
+            response = self._invoke_llm_with_retry(prompt, query=state["query"])
             # Clean response in case Grok adds conversational filler
             category = response.content.strip().split('\n')[0]
             return {"contract_type": category}
@@ -88,24 +95,32 @@ class ClauseAIGraph:
         """Coordinator node manages task distribution based on focus [cite: 8, 21]"""
         print(f"--- CREATING PLAN FOR: {state['contract_type']} ---")
         focus = state.get("focus", "All Domains")
-        if focus == "Legal & Compliance Only":
-            return {"review_plan": ["legal", "compliance"]}
-        elif focus == "Finance & Operations Only":
-            return {"review_plan": ["finance", "operations"]}
+        if focus == "Legal":
+            return {"review_plan": ["legal"]}
+        elif focus == "Financial":
+            return {"review_plan": ["finance"]}
+        elif focus == "Compliance":
+            return {"review_plan": ["compliance"]}
+        elif focus == "Operations":
+            return {"review_plan": ["operations"]}
         else:
             return {"review_plan": ["legal", "finance", "compliance", "operations"]}
 
 
-    def _get_context(self, query_terms: str) -> str:
+    def _get_context(self, query_terms: str, source_file: str = "") -> str:
         texts = [] # Initialize empty list first
         try:
             query_embedding = self.embeddings.embed_query(query_terms)
-            results = self.pinecone_index.query(
-                vector=query_embedding, 
-                top_k=5, 
-                include_metadata=True,
-                namespace="default"
-            )
+            kwargs = {
+                "vector": query_embedding, 
+                "top_k": 5, 
+                "include_metadata": True,
+                "namespace": "default"
+            }
+            if source_file:
+                kwargs["filter"] = {"source": {"$eq": source_file}}
+                
+            results = self.pinecone_index.query(**kwargs)
             texts = [match["metadata"]["text"] for match in results.get("matches", []) if "text" in match["metadata"]]
         except Exception as e:
             print(f"❌ Retrieval Error: {e}")
@@ -141,14 +156,19 @@ class ClauseAIGraph:
             return {"analysis_results": {}}
 
         print(f"--- {domain.upper()} DOMAIN ANALYSIS ---")
-        context = self._get_context(query_terms)
+        source_file = state.get("source_file", "")
+        context = self._get_context(query_terms, source_file)
         
+        scenario = state.get("scenario", "")
+        if scenario:
+            system_prompt += f"\n\nWHAT-IF SCENARIO:\nThe user requested to re-evaluate risks under the following hypothetical scenario: '{scenario}'. explicitly mention how this scenario impacts the findings."
+
         # SAFETY GATE: If no context was found, do not call the LLM
         if not context or context.strip() == "":
             analysis_content = f"No relevant {domain} clauses found for analysis."
         else:
             prompt = ChatPromptTemplate.from_messages([("system", system_prompt), ("human", "{context}")])
-            response = (prompt | self.llm).invoke({"context": context})
+            response = self._invoke_llm_with_retry(prompt, context=context)
             analysis_content = response.content
 
         # Store intermediate result in pinecone
@@ -180,17 +200,52 @@ class ClauseAIGraph:
         findings = "\n\n".join([f"### {k.upper()} ANALYSIS\n{v}" for k, v in state["analysis_results"].items()])
         prompt = ChatPromptTemplate.from_template(
             "As a Senior Contract Analyst, synthesize these domain findings into a {tone} report "
-            "using a {structure} structure. Highlight major risks and recommendations based on the findings:\n\n{findings}"
+            "using a {structure} structure. Highlight major risks and recommendations based on the findings:\n\n{findings}\n\n"
+            "IMPORTANT: At the very end of your response, you MUST output a JSON block containing Risk Metrics. "
+            "It must be formatted EXACTLY like this (use ```json):\n"
+            "```json\n"
+            "{{\n"
+            "  \"health_score\": {{\"compliance\": 85, \"finance\": 70, \"legal\": 60, \"operations\": 90}},\n"
+            "  \"risks\": [\n"
+            "    {{\n"
+            "      \"domain\": \"finance\", \n"
+            "      \"risk\": \"Late payment penalty\", \n"
+            "      \"severity\": 8, \n"
+            "      \"probability\": 6, \n"
+            "      \"recommendation\": \"Suggest capping late interest at 2%\", \n"
+            "      \"quote\": \"exact text from contract if available\",\n"
+            "      \"reasoning_steps\": [\"1. Contract states net 45 terms.\", \"2. Fails to cap late interest at 2%.\"],\n"
+            "      \"confidence_score\": 95\n"
+            "    }}\n"
+            "  ]\n"
+            "}}\n"
+            "```\n"
+            "WARNING: The JSON above is ONLY A FORMATTING EXAMPLE. DO NOT include the 'Late payment penalty' example in your output. You MUST extract real quotes and generate real reasoning based ONLY on the provided {findings}."
         )
-        report = (prompt | self.llm).invoke({
-            "tone": tone, 
-            "structure": structure, 
-            "findings": findings
-        })
+        report = self._invoke_llm_with_retry(
+            prompt, 
+            tone=tone, 
+            structure=structure, 
+            findings=findings
+        )
         return {"final_report": report.content}
 
 
-    def run(self, query: str, tone: str = "Professional", structure: str = "Detailed Analysis", focus: str = "All Domains"):
+    def stream(self, query: str, tone: str = "Professional", structure: str = "Detailed Analysis", focus: str = "All Domains", scenario: str = "", source_file: str = ""):
+        """Executes the analysis pipeline efficiently streaming node by node"""
+        initial_state = {
+            "query": query, 
+            "analysis_results": {}, 
+            "review_plan": [],
+            "tone": tone,
+            "structure": structure,
+            "focus": focus,
+            "scenario": scenario,
+            "source_file": source_file
+        }
+        return self.graph.stream(initial_state)
+
+    def run(self, query: str, tone: str = "Professional", structure: str = "Detailed Analysis", focus: str = "All Domains", scenario: str = "", source_file: str = ""):
         """Executes the analysis pipeline with customization options [cite: 21]"""
         initial_state = {
             "query": query, 
@@ -198,7 +253,9 @@ class ClauseAIGraph:
             "review_plan": [],
             "tone": tone,
             "structure": structure,
-            "focus": focus
+            "focus": focus,
+            "scenario": scenario,
+            "source_file": source_file
         }
         return self.graph.invoke(initial_state)
 
