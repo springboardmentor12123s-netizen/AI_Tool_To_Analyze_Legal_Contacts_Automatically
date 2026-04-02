@@ -1,47 +1,92 @@
-# 📄 ClauseAI – Multi-Agent Contract Analyzer
+# 📄 ClauseAI – Multi-Agent Contract Intelligence Platform
 
-ClauseAI is an AI-powered contract analysis system that uses multiple specialized agents to analyze legal agreements.
-The system processes contracts and provides insights related to **legal risks, financial obligations, regulatory compliance, and operational concerns**.
+ClauseAI is an advanced AI-powered system for analyzing legal contracts using a **multi-agent architecture**, **LangGraph orchestration**, and **Retrieval-Augmented Generation (RAG)**.
 
-The project uses a **multi-agent architecture with LangGraph**, **LLMs from Groq**, and **Retrieval Augmented Generation (RAG)** powered by **Pinecone**.
+It provides deep insights into **legal risks, financial exposure, compliance obligations, and operational challenges**, along with **chat-based Q&A**, **caching**, and **professional PDF reports**.
 
 ---
 
-# 🚀 Features
+# 🚀 Key Features
 
-* 📑 Upload contracts in **PDF, DOCX, or TXT**
-* 🤖 Multi-agent contract analysis
-* ⚖ Legal clause evaluation
-* 💰 Financial risk identification
-* 🛡 Regulatory compliance analysis
-* ⚙ Operational risk detection
-* 🔎 Retrieval Augmented Generation (RAG) using Pinecone
-* 🌐 Interactive interface using Streamlit
+### 🤖 Multi-Agent AI Analysis
+
+* Legal, Finance, Compliance, and Operations agents
+* Parallel + multi-round reasoning using LangGraph
+
+### 🔎 RAG with Pinecone
+
+* Context-aware retrieval using vector search
+* Contract-specific filtering using metadata
+
+### 💬 Contract Chat (Q&A)
+
+* Ask questions about contracts
+* Context-aware answers with memory (chat history)
+
+### ⚡ Smart Caching System
+
+* LLM response caching
+* Report caching
+* PDF caching
+* Q&A caching
+
+### 📄 Professional PDF Reports
+
+* Consulting-style structured reports
+* Executive summary + insights
+* Auto-generated downloadable PDFs
+
+### 📂 Multi-Contract Support
+
+* Upload multiple contracts
+* Parallel processing using ThreadPoolExecutor
+
+### 🎨 Production-Level UI
+
+* Clean dark UI (Streamlit)
+* Sidebar controls (tone, focus)
+* Chat panel + reports panel
 
 ---
 
 # 🧠 System Architecture
 
-ClauseAI uses a **multi-agent workflow** where specialized AI agents analyze different aspects of a contract.
+## 🔹 Multi-Agent Workflow
 
-### Agents
+1. Contract uploaded
+2. Parsed into text
+3. Chunked & stored in Pinecone (with metadata)
+4. Round 1 → Agents run in parallel
+5. Intermediate results stored in vector DB
+6. Round 2 → Agents refine using shared context
+7. Final report generated
+8. Chat + PDF enabled
 
-| Agent            | Responsibility                                               |
-| ---------------- | ------------------------------------------------------------ |
-| Legal Agent      | Identifies risky clauses, liabilities, and termination terms |
-| Finance Agent    | Detects payment terms, penalties, and financial risks        |
-| Compliance Agent | Checks regulatory issues such as GDPR or data protection     |
-| Operations Agent | Evaluates operational risks and execution challenges         |
+---
 
-### Workflow
+## 🤖 Agents
 
-1. Contract is uploaded through the Streamlit interface.
-2. The document is parsed and converted into text.
-3. Text is chunked and stored in **Pinecone Vector Database**.
-4. Agents retrieve relevant context using **RAG**.
-5. **LangGraph** orchestrates multi-agent execution.
-6. Each agent generates findings and risk analysis.
-7. Results are displayed in the UI.
+| Agent         | Responsibility                  |
+| ------------- | ------------------------------- |
+| ⚖ Legal       | Clauses, liability, termination |
+| 💰 Finance    | Payments, penalties, cost risks |
+| 🛡 Compliance | Regulations, GDPR, obligations  |
+| ⚙ Operations  | Delivery, execution, SLAs       |
+
+---
+
+## 🔁 LangGraph Flow
+
+```
+START
+  ↓
+[Legal R1]   [Finance R1]   [Compliance R1]   [Operations R1]
+        ↓ (sync)
+            ↓
+[Legal R2]   [Finance R2]   [Compliance R2]   [Operations R2]
+            ↓
+           END
+```
 
 ---
 
@@ -50,35 +95,16 @@ ClauseAI uses a **multi-agent workflow** where specialized AI agents analyze dif
 ```
 ClauseAI
 │
-├── agents
-│   ├── legal_agent.py
-│   ├── finance_agent.py
-│   ├── compliance_agent.py
-│   └── operations_agent.py
+├── agents/                # AI Agents
+├── prompts/               # Prompt engineering
+├── planner/               # LangGraph orchestration
+├── rag/                   # Retrieval pipeline (Pinecone)
+├── reporting/             # PDF + report generation
+├── utils/                 # LLM, caching, embeddings
 │
-├── prompts
-│   ├── base_prompt.py
-│   ├── legal_prompt.py
-│   ├── finance_prompt.py
-│   ├── compliance_prompt.py
-│   └── operations_prompt.py
-│
-├── planner
-│   ├── langgraph_planner.py
-│   └── planning_module.py
-│
-├── rag
-│   ├── ingest.py
-│   ├── retriever.py
-│   ├── pinecone_store.py
-│   └── store_intermediate.py
-│
-├── utils
-│   ├── groq_llm.py
-│   └── embeddings.py
-│
-├── parser.py
-├── app.py
+├── app.py                 # Streamlit UI
+├── parser.py              # File parsing
+├── requirements.txt
 └── README.md
 ```
 
@@ -86,24 +112,22 @@ ClauseAI
 
 # ⚙️ Installation
 
-### 1️⃣ Clone the repository
+## 1️⃣ Clone Repo
 
 ```
-git clone <repository-url>
+git clone <your-repo-url>
 cd ClauseAI
 ```
 
 ---
 
-### 2️⃣ Create virtual environment
+## 2️⃣ Create Virtual Environment
 
 ```
 python -m venv venv
 ```
 
-Activate environment
-
-Windows:
+Activate:
 
 ```
 venv\Scripts\activate
@@ -111,7 +135,7 @@ venv\Scripts\activate
 
 ---
 
-### 3️⃣ Install dependencies
+## 3️⃣ Install Dependencies
 
 ```
 pip install -r requirements.txt
@@ -119,29 +143,113 @@ pip install -r requirements.txt
 
 ---
 
-### 4️⃣ Setup environment variables
+## 4️⃣ Setup Environment Variables
 
-Create a `.env` file in the root directory:
+Create `.env` file:
 
 ```
-PINECONE_API_KEY=your_pinecone_key
-GROQ_API_KEY=your_groq_key
+PINECONE_API_KEY=your_key
+GROQ_API_KEY=your_key
 ```
 
 ---
 
-# ▶️ Running the Application
-
-Start the Streamlit app:
+# ▶️ Run Application
 
 ```
 streamlit run app.py
 ```
 
-Then open the browser and upload a contract file.
+---
+
+# 📊 How It Works (Deep Insight)
+
+### 🔹 RAG Pipeline
+
+* Contracts split into chunks
+* Stored in Pinecone with metadata:
+
+  * contract_id
+  * chunk_id
+* Retrieval uses strict filtering:
+
+```
+filter = {"contract_id": contract_id}
+```
 
 ---
 
+### 🔹 Multi-Round Reasoning
+
+#### Round 1:
+
+* Each agent analyzes contract independently
+
+#### Round 2:
+
+* Agents receive:
+
+  * Legal findings
+  * Finance findings
+  * Compliance findings
+  * Operations findings
+* Produces refined insights
+
+---
+
+### 🔹 Caching Strategy
+
+| Cache Type   | Purpose                  |
+| ------------ | ------------------------ |
+| LLM Cache    | Avoid repeated API calls |
+| Report Cache | Faster UI                |
+| PDF Cache    | Avoid regeneration       |
+| Q&A Cache    | Instant answers          |
+
+---
+
+### 🔹 Chat System
+
+* Uses RAG + history
+* Keeps last 5 conversations
+* Strict rule:
+
+```
+If not in contract → "Not mentioned in contract"
+```
+
+---
+
+# 📄 PDF Report Features
+
+* Cover page
+* Executive summary
+* Key insights
+* Section-wise analysis
+* Clean consulting format
+
+---
+
+# ⚡ Performance Optimizations
+
+* Parallel processing (max_workers=2)
+* Rate-limit handling (retry + backoff)
+* LLM response caching
+* Controlled API calls
+
+---
+
+# 🔐 Strict AI Controls
+
+Your system enforces:
+
+* ❌ No hallucinations
+* ❌ No external knowledge
+* ✅ Context-only answers
+* ✅ Domain-specific reasoning
+* ✅ Structured outputs
+
+---
 
 
 
