@@ -1,7 +1,0 @@
-streamlit
-langchain-groq
-langgraph
-pypdf
-python-dotenv
-pinecone-client
-sentence-transformers

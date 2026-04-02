@@ -1,8 +1,0 @@
-streamlit
-langchain
-langgraph
-openai
-pinecone-client
-pypdf
-python-docx
-tiktoken
