@@ -6,12 +6,16 @@ from agents.finance_agent import analyze_finance
 from agents.compliance_agent import analyze_compliance
 from agents.operations_agent import analyze_operations
 
-
 from rag.store_intermediate import store_agent_result
 
 
+# -------------------------
+# STATE
+# -------------------------
+
 class ContractState(TypedDict):
     text: str
+    contract_id: str
 
     legal_r1: str
     finance_r1: str
@@ -25,47 +29,51 @@ class ContractState(TypedDict):
 
 
 # -------------------------
-# ROUND 1 (parallel agents)
+# ROUND 1 (PARALLEL)
 # -------------------------
 
 def legal_r1_node(state):
-    result = analyze_legal(state["text"])
-    analysis=result["analysis"]
-    store_agent_result("legal_r1", "contract1", analysis)
+    result = analyze_legal(state["contract_id"])
+    analysis = result["analysis"]
+
+    store_agent_result("legal_r1", state["contract_id"], analysis)
+
     return {"legal_r1": analysis}
 
 
 def finance_r1_node(state):
-    result = analyze_finance(state["text"])
-    analysis=result["analysis"]
-    store_agent_result("finance_r1", "contract1", analysis)
+    result = analyze_finance(state["contract_id"])
+    analysis = result["analysis"]
+
+    store_agent_result("finance_r1", state["contract_id"], analysis)
+
     return {"finance_r1": analysis}
 
 
 def compliance_r1_node(state):
-    result = analyze_compliance(state["text"])
-    analysis=result["analysis"]
-    store_agent_result("compliance_r1", "contract1", analysis)
+    result = analyze_compliance(state["contract_id"])
+    analysis = result["analysis"]
+
+    store_agent_result("compliance_r1", state["contract_id"], analysis)
+
     return {"compliance_r1": analysis}
 
 
 def operations_r1_node(state):
-    result = analyze_operations(state["text"])
-    analysis=result["analysis"]
-    store_agent_result("operations_r1", "contract1", analysis)
+    result = analyze_operations(state["contract_id"])
+    analysis = result["analysis"]
+
+    store_agent_result("operations_r1", state["contract_id"], analysis)
+
     return {"operations_r1": analysis}
 
 
 # -------------------------
-# Build Multi-Agent Context
+# BUILD CONTEXT
 # -------------------------
 
 def build_context(state):
-
     return f"""
-Contract:
-{state['text']}
-
 Legal Findings:
 {state['legal_r1']}
 
@@ -81,15 +89,20 @@ Operations Findings:
 
 
 # -------------------------
-# ROUND 2 (multi-turn agents)
+# ROUND 2 (MULTI-TURN)
 # -------------------------
 
 def legal_r2_node(state):
-
     context = build_context(state)
-    result = analyze_legal(context)
-    analysis=result["analysis"]
-    store_agent_result("legal_r2", "contract1", analysis)
+
+
+    result = analyze_legal(
+    state["contract_id"],
+    extra_context=context
+)
+    analysis = result["analysis"]
+
+    store_agent_result("legal_r2", state["contract_id"], analysis)
 
     return {"legal_r2": analysis}
 
@@ -97,63 +110,72 @@ def legal_r2_node(state):
 def finance_r2_node(state):
 
     context = build_context(state)
-    result = analyze_finance(context)
-    analysis=result["analysis"]
-    store_agent_result("finance_r2", "contract1", analysis)
+
+    result = analyze_finance(
+    state["contract_id"],
+    extra_context=context
+)
+    analysis = result["analysis"]
+
+    store_agent_result("finance_r2", state["contract_id"], analysis)
 
     return {"finance_r2": analysis}
 
 
 def compliance_r2_node(state):
-
     context = build_context(state)
-    result = analyze_compliance(context)
-    analysis=result["analysis"]
-    store_agent_result("compliance_r2", "contract1", analysis)
+
+    result = analyze_compliance(
+    state["contract_id"],
+    extra_context=context
+)
+    analysis = result["analysis"]
+
+    store_agent_result("compliance_r2", state["contract_id"], analysis)
 
     return {"compliance_r2": analysis}
 
 
 def operations_r2_node(state):
-
     context = build_context(state)
-    result = analyze_operations(context)
+
+    result = analyze_operations(
+    state["contract_id"],
+    extra_context=context
+)
     analysis = result["analysis"]
-    store_agent_result("operations_r2", "contract1", analysis)
+
+    store_agent_result("operations_r2", state["contract_id"], analysis)
 
     return {"operations_r2": analysis}
 
 
 # -------------------------
-# Synchronization Node
+# SYNC NODE
 # -------------------------
 
 def sync_node(state):
-    """
-    Barrier node that waits until all
-    Round-1 agents complete.
-    """
     return state
 
 
 # -------------------------
-# LangGraph Pipeline
+# MAIN GRAPH
 # -------------------------
 
-def run_langgraph(contract_text):
+def run_langgraph(contract_text, contract_id):
 
     graph = StateGraph(ContractState)
 
-    # Round 1 agents
+    # Round 1
     graph.add_node("legal_r1", legal_r1_node)
     graph.add_node("finance_r1", finance_r1_node)
     graph.add_node("compliance_r1", compliance_r1_node)
     graph.add_node("operations_r1", operations_r1_node)
 
-    # Sync node
+    # Sync
     graph.add_node("sync", sync_node)
 
-    # Round 2 agents
+    # Round 2
     graph.add_node("legal_r2", legal_r2_node)
     graph.add_node("finance_r2", finance_r2_node)
     graph.add_node("compliance_r2", compliance_r2_node)
@@ -169,7 +191,7 @@ def run_langgraph(contract_text):
     graph.add_edge(START, "operations_r1")
 
     # -------------------------
-    # WAIT FOR ALL AGENTS
+    # SYNC
     # -------------------------
 
     graph.add_edge("legal_r1", "sync")
@@ -199,6 +221,7 @@ def run_langgraph(contract_text):
 
     return app.invoke({
         "text": contract_text,
+        "contract_id": contract_id,
 
         "legal_r1": "",
         "finance_r1": "",

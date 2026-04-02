@@ -4,13 +4,24 @@ from rag.retriever import retrieve_context
 from prompts.operations_prompt import operations_prompt
 
 
-def analyze_operations(contract_text):
-    context = retrieve_context(
-        "delivery timelines service obligations operational risks",
-        contract_text
-    )
+def analyze_operations(contract_id:str,extra_context: str = ""):
 
-    prompt = operations_prompt(context)
-    result = groq_chat(prompt)
+    query = "delivery timeline SLA service levels execution delays dependencies operational risk"
+
+    retrieved_context = retrieve_context(query, contract_id)
+
+    # 🧠 Combine with Round 1 insights
+    final_context = f"""
+RETRIEVED CONTRACT CLAUSES:
+{retrieved_context}
+
+----------------------------------
+
+CROSS-AGENT INSIGHTS:
+{extra_context}
+"""
+
+    prompt = operations_prompt(final_context)
+    result = groq_chat(prompt, final_context)
 
     return {"analysis": result}

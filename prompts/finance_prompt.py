@@ -2,10 +2,7 @@ from prompts.base_prompt import build_base_prompt
 
 def finance_prompt(context: str):
     task = """
-Analyze financial risks, payment terms, penalties,
-indemnification, and cost exposures.
-
-If legal findings indicate risks,
-explain their financial impact.
+Identify payment risks, penalties, and financial exposure
+based only on contract terms.
 """
-    return build_base_prompt("Financial Risk Analyst", task, context)
+    return build_base_prompt("Financial Analyst", task, context)

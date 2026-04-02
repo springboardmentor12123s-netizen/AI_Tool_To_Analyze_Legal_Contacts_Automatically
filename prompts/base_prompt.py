@@ -1,35 +1,71 @@
 from langchain_core.prompts import PromptTemplate
 
-
 def build_base_prompt(role: str, task: str, context: str):
 
     template = """
-You are a {role} in a multi-agent contract analysis system.
+You are a {role} analyzing a contract.
 
-Your job is to analyze the contract using ONLY the information in the context.
+CRITICAL INSTRUCTIONS (STRICT):
+- Use ONLY the provided context
+- Do NOT assume, infer, or add external knowledge
+- If information is NOT present → DO NOT mention it
+- Do NOT invent locations, laws, or entities
+- Stay STRICTLY within your domain
 
-Important Rules:
-- Do NOT guess or invent information.
-- Only reference other agents if their findings appear in the context.
-- Do NOT create agents like "Agent 1", "Agent 2".
-- If no prior findings are available, analyze the contract independently.
-- Keep answers short and clear (max 2-3 points per section).
+DOMAIN RESTRICTION:
+- Legal → clauses, liability, termination
+- Finance → payment, penalties, cost ONLY
+- Compliance → regulations ONLY if explicitly mentioned
+- Operations → execution, delivery ONLY
 
-Context:
-{context}
+FORMAT RULES (VERY STRICT):
+- ONLY 3 sections: Findings, Risks, Advice
+- NO other headings allowed
+- Bullet points must start with "-"
+- Each bullet must be ONE short line
+- NO paragraphs
 
-Task:
-{task}
-
-Return output exactly in this format:
+SECTION-SPECIFIC RULES (STRICT):
 
 Findings:
+- MUST contain EXACTLY 3 bullet points
+- DO NOT exceed or reduce
+
+Risks:
+- MUST contain between 2 and 5 bullet points ONLY
+- Include ONLY important risks from context
+- Order by importance (critical first)
+- If no risks → write "- None"
+
+Advice:
+- MUST contain EXACTLY 3 bullet points
+- DO NOT exceed or reduce
+
+CRITICAL:
+- Do NOT apply "2 to 5" rule to Findings or Advice
+- Each section must follow ONLY its own rule
+
+CONTEXT:
+{context}
+
+TASK:
+{task}
+
+OUTPUT FORMAT (STRICTLY FOLLOW):
+
+Findings:
+- ...
+- ...
 - ...
 
 Risks:
 - ...
+- ...
+- ...
 
 Advice:
+- ...
+- ...
 - ...
 """
 
