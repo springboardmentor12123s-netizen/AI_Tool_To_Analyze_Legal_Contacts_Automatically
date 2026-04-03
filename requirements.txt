@@ -1,0 +1,16 @@
+streamlit
+openai
+pypdf
+python-dotenv
+requests
+langchain
+langgraph
+langchain-openai
+langchain-pinecone
+langchain-text-splitters
+langchain-groq
+pinecone
+pinecone-client
+sentence-transformers
+python-docx
+reportlab>=4.0
