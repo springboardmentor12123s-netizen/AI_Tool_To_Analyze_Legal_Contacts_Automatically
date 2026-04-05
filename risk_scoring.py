@@ -3,18 +3,16 @@ def calculate_risk_score(text: str):
     score = 0
 
     keywords = {
-        "undefined": 20,
-        "not defined": 20,
-        "unclear": 15,
-        "liability": 20,
-        "breach": 15,
-        "data": 15,
-        "confidentiality": 15,
-        "payment": 10,
-        "privacy": 10,
-        "ip": 15,
-        "intellectual property": 20
-    }
+    "high risk": 30,
+    "breach": 15,
+    "unclear": 10,
+    "undefined": 10,
+    "data breach": 20,
+    "liability": 10,
+    "privacy": 10,
+    "intellectual property": 10,
+    "penalty": 10,
+}
 
     for word, points in keywords.items():
         if word in text:
