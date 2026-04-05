@@ -1,4 +1,4 @@
-from agents import compliance_agent, finance_agent, legal_agent
+from agents import compliance_agent, finance_agent, legal_agent, operations_agent   # ✅ added operations_agent
 from planning_module import planning_agent
 from aggregator import aggregate_results
 from concurrent.futures import ThreadPoolExecutor
@@ -16,7 +16,8 @@ def coordinator(text):
 
     print("Step 2: Running agents in parallel")
 
-    with ThreadPoolExecutor(max_workers=3) as executor:
+    # Increase worker count from 3 → 4
+    with ThreadPoolExecutor(max_workers=4) as executor:
 
         futures = {}
 
@@ -29,6 +30,10 @@ def coordinator(text):
         if "compliance" in execution_order:
             futures["compliance"] = executor.submit(compliance_agent, text)
 
+        if "operations" in execution_order:        # ✅ NEW
+            futures["operations"] = executor.submit(operations_agent, text)
+
+        # Collect results
         for key, future in futures.items():
             agent_results[key] = future.result()
 
