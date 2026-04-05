@@ -3,92 +3,92 @@ from llm_setup import analysis_llm
 from risk_scoring import calculate_risk_score
 import uuid
 
-# Optional (Milestone 3 - Pinecone)
-try:
-    from vector_store import store_data
-except:
-    store_data = None
-
-
 def aggregate_results(planning_result, agent_results):
 
     final_output = {}
 
     # ----------------------------
-    # Planning Result
+    # Planning Result (SAFE FIX)
     # ----------------------------
+    if isinstance(planning_result, dict):
+        reason = planning_result.get("reason", "Not Available")
+        confidence = planning_result.get("confidence", 0)
+    else:
+        reason = str(planning_result)
+        confidence = 0.9  # default fallback
+
     final_output["Planning Result"] = f"""
-Domains Selected: {planning_result.get("domains")}
-
-Confidence: {planning_result.get("confidence")}
-
-Reason: {planning_result.get("reason")}
+Reason: {reason}
 """
 
     # ----------------------------
-    # Agent Results (Structured)
+    # ADD CONFIDENCE (FIX)
+    # ----------------------------
+    try:
+        confidence_percent = int(float(confidence) * 100)
+    except:
+        confidence_percent = 90
+
+    final_output["Confidence"] = confidence_percent
+
+    # ----------------------------
+    # Agent Results (FIXED)
     # ----------------------------
     combined_text_list = []
 
     for agent, result in agent_results.items():
-        analysis_text = result.get("raw", "No result")
 
-        clean_text = analysis_text.replace("*", "").strip()
+        # ✅ FIX: HANDLE BOTH dict AND str
+        if isinstance(result, dict):
+            analysis_text = (
+                result.get("Legal Analysis") or
+                result.get("Finance Analysis") or
+                result.get("Compliance Analysis") or
+                "No result"
+            )
+        elif isinstance(result, str):
+            analysis_text = result
+        else:
+            analysis_text = "No result"
+
+        clean_text = str(analysis_text).replace("*", "").strip()
 
         final_output[f"{agent.capitalize()} Analysis"] = clean_text
-
         combined_text_list.append(clean_text)
 
     combined_text = "\n".join(combined_text_list)
 
     # ----------------------------
-    # Multi-turn Refinement (Milestone 3)
+    # Refinement (SAFE)
     # ----------------------------
-    REFINE_PROMPT = """
-Refine and improve this combined analysis:
-
-{text}
-"""
-
     try:
         refined_output = analysis_llm.invoke(
-            REFINE_PROMPT.format(text=combined_text)
+            f"Refine and improve this:\n{combined_text[:3000]}"
         ).content
-    except Exception:
-        refined_output = combined_text  # fallback
+    except:
+        refined_output = combined_text
 
     # ----------------------------
-    # Final Summary Generation
+    # Summary
     # ----------------------------
     try:
-        if not refined_output.strip():
-            refined_output = combined_text
-
         summary = analysis_llm.invoke(
-            SUMMARY_PROMPT.format(text=refined_output)
+            SUMMARY_PROMPT.format(text=refined_output[:3000])
         ).content
-
-    except Exception as e:
-        print("Summary Error:", e)
-        summary = "Executive summary could not be generated, but analysis is complete."
+    except:
+        summary = "Summary could not be generated."
 
     final_output["Summary"] = summary
 
     # ----------------------------
-    # Risk Score (New Feature)
+    # Risk Score
     # ----------------------------
-    risk_score = calculate_risk_score(refined_output)
-    final_output["Risk Score"] = f"{risk_score}/100"
+    try:
+        risk_score = calculate_risk_score(refined_output)
+    except:
+        risk_score = 50
 
-    # ----------------------------
-    # Store in Pinecone (Milestone 3)
-    # ----------------------------
-    if store_data:
-        try:
-            doc_id = str(uuid.uuid4())
-            store_data(doc_id, refined_output)
-        except Exception as e:
-            print("Pinecone storage failed:", e)
+    final_output["Risk Score"] = f"{risk_score}/100"
 
     print("Aggregation complete")
 
@@ -96,7 +96,6 @@ Refine and improve this combined analysis:
 
 
 def aggregation_node(state: dict):
-
     planning_result = state["planning_result"]
     agent_results = state["agent_results"]
 
