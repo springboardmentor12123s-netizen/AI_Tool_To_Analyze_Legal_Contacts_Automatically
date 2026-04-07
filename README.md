@@ -1,142 +1,122 @@
-# ClauseAI - Contract Analysis Agent System
+# 📄 AI Tool to Analyze Legal Contracts Automatically
 
-ClauseAI is a multi-agent system designed to analyze legal contracts. It uses **LangGraph** to orchestrate four specialized agents (Compliance, Finance, Legal, Operations) and **Pinecone** for Retrieval-Augmented Generation (RAG).
+An AI-powered web application that analyzes legal contracts and provides simplified insights, risk detection, and clause explanations to help users understand complex legal documents easily.
 
-## Features
-- **Multi-Agent Architecture**: Specialized agents for different domains.
-- **RAG Integration**: Retrieves relevant contract clauses using Pinecone and HuggingFace embeddings.
-- **Document Support**: Parses PDF, DOCX, and TXT files.
-- **Local Embeddings**: Uses `all-MiniLM-L6-v2` (no OpenAI key required for embeddings).
-- **LLM**: Powered by Groq (Llama 3.3 70B).
+---
 
-## Setup
+## 🚀 Project Overview
 
-1.  **Clone the repository**:
-    ```bash
-    git clone <repo-url>
-    cd clauseai
-    ```
+Legal documents are often complex and difficult to understand. This project aims to simplify contract analysis using Artificial Intelligence by extracting key information, identifying risks, and presenting results in a user-friendly format.
 
-2.  **Install dependencies**:
-    ```bash
-    # Create virtual environment
-    python3 -m venv .venv
-    source .venv/bin/activate
-    
-    # Install packages
-    pip install -r requirements.txt
-    ```
+---
 
-3.  **Environment Variables**:
-    Create a `.env` file with:
-    ```bash
-    GROQ_API_KEY=your_groq_key
-    PINECONE_API_KEY=your_pinecone_key
-    ```
-    *Note: `OPENAI_API_KEY` is NOT required.*
+## ✨ Features
 
-4.  **Initialize Pinecone Index**:
-    Run the setup script to create the `clauseai` index:
-    ```bash
-    python setup_pinecone.py
-    ```
+- 📂 Upload legal documents (PDF / TXT / DOCX)
+- 🤖 AI-based contract analysis
+- ⚠️ Risk detection in clauses
+- 🧾 Automatic summarization
+- 📊 Key information extraction
+- 💡 Easy-to-understand explanations
+- 🌐 Simple web interface
 
-## Usage
+---
 
-### Run Experiment
-To run a sample contract analysis:
+## 🧠 How It Works
+
+1. User uploads a legal document  
+2. Text is extracted from the file  
+3. AI model processes the content  
+4. System identifies:
+   - Important clauses  
+   - Risks and obligations  
+   - Summary of the contract  
+5. Results are displayed on the web interface  
+
+---
+
+## 🛠️ Tech Stack
+
+**Frontend:**
+- HTML
+- CSS
+- JavaScript
+
+**Backend:**
+- Python (Flask)
+
+**AI/ML:**
+- OpenAI API / NLP models
+
+**Tools:**
+- VS Code / Eclipse
+- Git & GitHub
+
+
+---
+
+## ⚙️ Installation & Setup
+
+### 1️⃣ Clone the Repository
 ```bash
-python experiment.py
-```
-This script will:
-1. Create a sample contract (`sample_contract.txt`).
-2. Ingest it into Pinecone.
-3. specific agents query Pinecone for relevant clauses.
-4. Print the analysis from each agent.
+git clone https://github.com/springboardmentor12123s-netizen/AI_Tool_To_Analyze_Legal_Contacts_Automatically.git
+cd AI_Tool_To_Analyze_Legal_Contracts_Automatically
 
-### Run Tests
-```bash
-python -m pytest tests/
-```
 
-## Project Structure
-- `src/agent_graph.py`: LangGraph definition and agent logic.
-- `src/ingest.py`: Document loading and Pinecone ingestion.
-- `tests/`: Unit tests.
-- `experiment.py`: Main script for running contract analysis experiments.
-- `requirements.txt`: Python dependencies.
+### 2️⃣ Create Virtual Environment
+python -m venv venv
+venv\Scripts\activate   # Windows
 
-## OUTPUT
-Risk Analysis Results
-Compliance Analysis
-COMPLIANCE RISK 1
-Clause: 2.C
-Risk Type: Contract Termination
-Risk Level: High
-Recommendation: Review and revise the termination clause to ensure it aligns with industry standards and provides adequate notice to the Consultant.
 
-COMPLIANCE RISK 2
-Clause: 2.F
-Risk Type: Payment Delay
-Risk Type: Risk Level: Medium
-Recommendation: Clarify the payment approval process to ensure timely payments and avoid delays.
+### 3️⃣ Install Dependencies
+pip install -r requirements.txt
 
-COMPLIANCE RISK 3
-Clause: 2.H
-Risk Type: Invoicing and Reimbursement
-Risk Level: Medium
-Recommendation: Review and revise the invoicing requirements to ensure compliance with industry standards and reduce the risk of reimbursement disputes.
-Legal Analysis
-LEGAL RISK 1
-Clause: 2.C
-Risk Type: Contract Termination
-Risk Level: High
-Recommendation: Review and revise the termination clause to ensure it aligns with industry standards and provides adequate notice to the Consultant.
+### 4️⃣ Add API Key
+Create a .env file in the root folder and add:
+OPENAI_API_KEY=your_api_key_here
 
-LEGAL RISK 2
-Clause: 2.F
-Risk Type: Payment Delay
-Risk Level: Medium
-Recommendation: Clarify the payment approval process to ensure timely payments and avoid delays.
+### 5️⃣ Run the Application
+python app.py
 
-LEGAL RISK 3
-Clause: 2.H
-Risk Type: Invoicing and Reimbursement
-Risk Level: Medium
-Recommendation: Review and revise the invoicing requirements to ensure compliance with industry standards and reduce the risk of reimbursement disputes.
-Finance Analysis
-FINANCIAL RISK 1
-Clause: 2.C
-Risk Type: Contract Termination
-Risk Level: High
-Recommendation: Review and revise the termination clause to ensure it aligns with industry standards and provides adequate notice to the Consultant.
+### 6️⃣ Open in Browser
+http://127.0.0.1:5000/
 
-FINANCIAL RISK 2
-Clause: 2.F
-Risk Type: Payment Delay
-Risk Level: Medium
-Recommendation: Clarify the payment approval process to ensure timely payments and avoid delays.
 
-FINANCIAL RISK 3
-Clause: 2.H
-Risk Type: Invoicing and Reimbursement
-Risk Level: Medium
-Recommendation: Review and revise the invoicing requirements to ensure compliance with industry standards and reduce the risk of reimbursement disputes.
-Operations Analysis
-OPERATIONS RISK 1
-Clause: 2.C
-Risk Type: Contract Termination
-Risk Level: High
-Recommendation: Review and revise the termination clause to ensure it aligns with industry standards and provides adequate notice to the Consultant.
 
-OPERATIONS RISK 2
-Clause: 2.F
-Risk Type: Payment Delay
-Risk Level: Medium
-Recommendation: Clarify the payment approval process to ensure timely payments and avoid delays.
+## 🎯 Use Cases
 
-OPERATIONS RISK 3
-Clause: 2.H
-Risk Type: Invoicing and Reimbursement
-Risk Level: Medium
-Recommendation: Review and revise the invoicing requirements to ensure compliance with industry standards and reduce the risk of reimbursement disputes.
+- 👨‍💼 Business contract review  
+- 🧑‍💻 Freelancer agreement analysis  
+- 🏠 Rental / lease agreement understanding  
+- 📑 Legal document summarization  
+- 🎓 Academic/legal research  
+
+---
+
+## 🔐 Limitations
+
+- Not a replacement for professional legal advice  
+- AI-generated insights may not be 100% accurate  
+- Works best with well-structured documents  
+
+---
+
+## 🔮 Future Enhancements
+
+- 📊 Risk scoring system  
+- 🌍 Multi-language support  
+- 💬 Chat with contract feature  
+- 📁 Multiple document comparison  
+- 📈 Analytics dashboard  
+
+---
+
+## 📜 License
+
+This project is licensed under the MIT License.
+
+---
+
+## 👩‍💻 Author
+
+**Vaishnavi Kanade**
